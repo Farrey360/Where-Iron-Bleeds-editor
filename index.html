@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>BoP Vector Map Editor</title>
+<title>Atelier — Grande Stratégie 1936</title>
 <meta name="theme-color" content="#0e0f13">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -110,7 +110,7 @@ input[type=color]{width:38px;height:32px;padding:2px;background:#0f1117;border:1
 <body>
 
 <div id="home" hidden>
-  <h1>BoP Vector Map Editor</h1>
+  <h1>Cartes</h1>
   <div class="sub">Carte vectorielle du monde : découpe les terres en provinces, regroupe-les en pays et régions, exporte des polygones lon/lat.</div>
   <div id="projects"></div>
 </div>
@@ -3218,6 +3218,7 @@ function toast(msg) {
   clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200);
 }
 const busy = (on, msg) => { $('#busy').textContent = msg || 'Chargement…'; $('#busy').hidden = !on; };
+window.busy = busy;
 function loadScript(src) {
   return new Promise((res, rej) => {
     const s = document.createElement('script');
@@ -3228,7 +3229,7 @@ function loadScript(src) {
 const tick = () => new Promise(r => setTimeout(r, 30));
 
 async function showHome() {
-  $('#editor').hidden = true; $('#home').hidden = false;
+  $('#editor').hidden = true; $('#home').hidden = false; if ($('#hub')) $('#hub').hidden = true;
   let list = [];
   try { list = (await DB.list()).sort((a, b) => b.updated - a.updated); } catch (e) { /* stockage indisponible */ }
   $('#projects').innerHTML = `
@@ -3294,8 +3295,10 @@ function openEditor(fit) {
   } catch (e) { DB.db = null; console.warn('IndexedDB indisponible', e); }
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
   window.addEventListener('beforeunload', ev => { if (S.dirty && DB.db) { saveNow(); } });
-  showHome();
+  window.Atelier ? Atelier.showHub() : showHome();
 })();
 </script>
+<script src="research_core.js"></script>
+<script src="research_editor.js"></script>
 </body>
 </html>

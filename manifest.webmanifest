@@ -1,7 +1,7 @@
 {
-  "name": "BoP Vector Map Editor",
-  "short_name": "BoP Vector",
-  "description": "Éditeur vectoriel : découper le monde en provinces, pays et régions (lon/lat).",
+  "name": "Atelier — Grande Stratégie 1936",
+  "short_name": "Atelier GS",
+  "description": "Atelier de modding de Grande Stratégie 1936 : carte, arbre de recherche et plus.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",

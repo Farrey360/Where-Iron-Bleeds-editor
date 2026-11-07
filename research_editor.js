@@ -556,7 +556,7 @@
           <b>Clic sur un trait</b> puis <kbd>Suppr</kbd> : le retirer.<br>
           <kbd>Maj</kbd>+clic : plusieurs cases ; <kbd>Maj</kbd>+glisser dans le vide : rectangle.<br>
           Glisser dans le vide ou clic du milieu : se déplacer. <kbd>Ctrl</kbd>+molette : zoom.<br>
-          <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> annuler, <kbd>Ctrl+D</kbd> dupliquer, <kbd>Ctrl+S</kbd> envoyer dans le jeu.
+          <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> annuler, <kbd>Ctrl+D</kbd> dupliquer, <kbd>Ctrl+S</kbd> enregistrer (sans toucher au jeu). <b>🤖 IA</b> : demander à une IA de modifier l'arbre.
         </div>`;
       $('#rFName').onchange = e => { Editor.before(); tree.setName('techfolder_' + f, e.target.value, 'french'); Editor.render(); };
       $('#rFNameEn').onchange = e => { Editor.before(); tree.setName('techfolder_' + f, e.target.value, 'english'); Editor.status(); };

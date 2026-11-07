@@ -302,6 +302,15 @@
     doRedo() { if (!Editor.redo.length) return; Editor.undo.push(Editor.tree.snapshot()); Editor.restore(Editor.redo.pop()); },
 
     vertical() { return Editor.tree.folderVertical(Editor.folder); },
+    /** Ces recherches et toutes celles du même dossier qui les demandent, de proche en proche. */
+    withChildren(list) {
+      const kids = new Map();
+      for (const t of Editor.tree.techs(Editor.folder))
+        for (const r of t.list('requires')) { if (!kids.has(r)) kids.set(r, []); kids.get(r).push(t); }
+      const out = new Set(list), stack = [...list];
+      while (stack.length) for (const c of kids.get(stack.pop().get('id')) || []) if (!out.has(c)) { out.add(c); stack.push(c); }
+      return [...out];
+    },
     W(t) { return t.get('small') === 'yes' ? SMALL_W : BOX_W; },
     name(t) { return Editor.tree.name('tech_' + t.get('id')) || t.get('id'); },
 
@@ -452,7 +461,7 @@
         return;
       }
       if (sel.length > 1) {
-        el.innerHTML = `<h3>${sel.length} recherches</h3><div class="help">Glisser l'une d'elles déplace tout le groupe.</div><hr>
+        el.innerHTML = `<h3>${sel.length} recherches</h3><div class="help">Glisser l'une d'elles déplace tout le groupe et ce qui en dépend (Ctrl = le groupe seul).</div><hr>
           <div class="row"><button id="rAlignH">Aligner en ligne</button><button id="rAlignV">En colonne</button></div>
           <div class="row"><button id="rExc">Rendre exclusives</button></div>
           <button class="danger" id="rDelSel">Supprimer les ${sel.length} (Suppr)</button>`;
@@ -542,7 +551,7 @@
         <div class="row"><button id="rAddYear">＋ Année</button><button id="rAddTitle">＋ Titre</button></div>
         <hr><div class="help">
           <b>Double-clic</b> dans le vide : nouvelle recherche.<br>
-          <b>Glisser</b> une case : la déplacer (<kbd>Alt</kbd> = sans aimant).<br>
+          <b>Glisser</b> une case : la déplacer avec les recherches qui en dépendent (<kbd>Ctrl</kbd> = elle seule, <kbd>Alt</kbd> = sans aimant).<br>
           <b>Rond bleu</b> d'une case → autre case : la 2e demande la 1re.<br>
           <b>Clic sur un trait</b> puis <kbd>Suppr</kbd> : le retirer.<br>
           <kbd>Maj</kbd>+clic : plusieurs cases ; <kbd>Maj</kbd>+glisser dans le vide : rectangle.<br>
@@ -717,7 +726,9 @@
         if (e.shiftKey) { if (Editor.sel.has(t)) Editor.sel.delete(t); else Editor.sel.add(t); }
         else if (!Editor.sel.has(t)) Editor.sel = new Set([t]);
         Editor.selLink = null; Editor.selTitle = null;
-        Editor.drag = { kind: 'move', p, snap: Editor.tree.snapshot(), start: [...Editor.sel].map(s => [s, s.num('x', 0), s.num('y', 0)]), moved: false };
+        // les recherches qui en dépendent (dessous dans l'arbre) suivent ; Ctrl = la sélection seule
+        const moving = e.ctrlKey ? [...Editor.sel] : Editor.withChildren([...Editor.sel]);
+        Editor.drag = { kind: 'move', p, snap: Editor.tree.snapshot(), start: moving.map(s => [s, s.num('x', 0), s.num('y', 0)]), moved: false };
         Editor.markSel();
         Editor.side();
         e.preventDefault();

@@ -227,14 +227,18 @@
       return id;
     }
 
-    /** Année de la bande où tombe ce point (null si le dossier n'a pas de lignes d'années). */
+    /** Année de ce point (null si le dossier n'a pas de lignes d'années). Entre deux lignes éloignées de plusieurs
+     *  années, on compte au prorata : à mi-chemin entre 1942 et 1944 = 1943. Avant la 1re ligne = 1re, après la dernière = dernière. */
     yearAt(folder, x, y) {
       const ys = this.years(folder);
       if (!ys.length) return null;
-      const v = this.folderVertical(folder) ? y : x;
-      let year = ys[0].year;
-      for (const b of ys) if (v >= b.at - 10) year = b.year;
-      return year;
+      const v = (this.folderVertical(folder) ? y : x) + 10;   // une case posée juste au-dessus de sa ligne compte pour elle
+      if (v < ys[0].at) return ys[0].year;
+      for (let i = 0; i + 1 < ys.length; i++) {
+        const a = ys[i], b = ys[i + 1];
+        if (v < b.at) return b.at > a.at ? a.year + Math.floor((b.year - a.year) * (v - a.at) / (b.at - a.at) + 1e-9) : a.year;
+      }
+      return ys[ys.length - 1].year;
     }
     /** Met l'année d'une recherche à celle de la ligne où elle se trouve ; true si elle a changé. */
     fitYear(t) {

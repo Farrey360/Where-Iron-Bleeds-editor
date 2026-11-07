@@ -1,6 +1,6 @@
 /* Atelier — cœur de l'éditeur d'arbre de recherche (sans interface, testable sous Node).
  *
- * Lit et réécrit les fichiers du jeu Grande Stratégie 1936 :
+ * Lit et réécrit les fichiers du jeu Where Iron Bleeds :
  *   content/base/common/technologies*.txt  (une entrée par ligne : folder / year / title / tech / air_unlock)
  *   content/base/localisation/<langue>/*.txt (clé = "texte")
  * Les lignes que l'éditeur ne touche pas (commentaires, lignes vides, entrées inconnues) sont gardées telles quelles,
@@ -227,13 +227,27 @@
       return id;
     }
 
+    /** Année de la bande où tombe ce point (null si le dossier n'a pas de lignes d'années). */
+    yearAt(folder, x, y) {
+      const ys = this.years(folder);
+      if (!ys.length) return null;
+      const v = this.folderVertical(folder) ? y : x;
+      let year = ys[0].year;
+      for (const b of ys) if (v >= b.at - 10) year = b.year;
+      return year;
+    }
+    /** Met l'année d'une recherche à celle de la ligne où elle se trouve ; true si elle a changé. */
+    fitYear(t) {
+      const y = this.yearAt(t.get('folder'), t.num('x', 0), t.num('y', 0));
+      if (y === null || t.num('year') === y) return false;
+      t.set('year', fmtNum(y));
+      return true;
+    }
+
     /** Recherche nouvelle à cette place ; l'année est celle de la bande où elle tombe. */
     addTech(folder, x, y) {
       const id = this.newId('nouvelle');
-      const vertical = this.folderVertical(folder);
-      const ys = this.years(folder);
-      let year = ys.length ? ys[0].year : 1936;
-      for (const b of ys) if ((vertical ? y : x) >= b.at - 10) year = b.year;
+      const year = this.yearAt(folder, x, y) ?? 1936;
       const e = new Entry('tech', [{ k: 'id', v: id }, { k: 'folder', v: folder }, { k: 'x', v: fmtNum(Math.round(x)) }, { k: 'y', v: fmtNum(Math.round(y)) }, { k: 'year', v: fmtNum(year) }, { k: 'cost', v: '1' }]);
       this.fileForFolder(folder).add(e);
       this.setName('tech_' + id, 'Nouvelle recherche', 'french');

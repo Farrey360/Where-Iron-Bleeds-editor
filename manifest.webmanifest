@@ -1,7 +1,7 @@
 {
-  "name": "Atelier — Grande Stratégie 1936",
-  "short_name": "Atelier GS",
-  "description": "Atelier de modding de Grande Stratégie 1936 : carte, arbre de recherche et plus.",
+  "name": "Where Iron Bleeds — Atelier",
+  "short_name": "Atelier WIB",
+  "description": "Atelier de modding de Where Iron Bleeds : carte, arbre de recherche et plus.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",

@@ -108,7 +108,8 @@
       });
     },
     async get(k) { if (!KV.db) await KV.open(); return new Promise(res => { const q = KV.db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(undefined); }); },
-    async set(k, v) { if (!KV.db) await KV.open(); return new Promise(res => { const t = KV.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => res(); }); },
+    async set(k, v) { if (!KV.db) await KV.open(); return new Promise((res, rej) => { const t = KV.db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); },
+    async del(k) { if (!KV.db) await KV.open(); return new Promise(res => { const t = KV.db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = () => res(); t.onerror = () => res(); }); },
   };
 
   /* ================================================================== le dossier du jeu */
@@ -208,6 +209,7 @@
 
   /* ================================================================== éditeur d'arbre */
   const BOX_W = 134, SMALL_W = 62, BOX_H = 62, SNAP = 10;
+  const DRAFT = 'researchDraft';   // clé du brouillon dans IndexedDB
   const KNOWN = new Set(['id', 'icon', 'folder', 'x', 'y', 'small', 'year', 'cost', 'requires', 'exclusive']);
 
   const Editor = {
@@ -229,6 +231,15 @@
           locs[lang] = new R.Loc(lf, 'technologies.txt');
         }
         Editor.tree = new R.Tree(files, locs);
+        Editor.disk = Editor.tree.snapshot();
+        // brouillon enregistré sans l'envoyer dans le jeu : on le reprend
+        const d = await KV.get(DRAFT).catch(() => null);
+        if (d && d.snap && d.snap !== Editor.disk
+          && (d.disk === Editor.disk || confirm('Les fichiers du jeu ont changé depuis ton brouillon enregistré. Reprendre le brouillon quand même ? (Annuler = ouvrir le jeu tel qu\'il est, le brouillon reste gardé)'))) {
+          Editor.tree = R.Tree.restore(d.snap, Editor.tree.saved);
+          toast('Brouillon repris — pas encore envoyé dans le jeu');
+        }
+        Editor.savedSig = Editor.sig();
         try { Editor.icons = (await Game.list('gfx/interface/research')).filter(n => n.endsWith('.png')).map(n => n.slice(0, -4)); } catch (e) { Editor.icons = []; }
         Editor.undo = []; Editor.redo = [];
         if (!Editor.tree.folders().includes(Editor.folder)) Editor.folder = Editor.tree.folders()[0] || '';
@@ -245,14 +256,33 @@
     },
 
     dirty() { return Editor.tree && Editor.tree.changes().length > 0; },
+    /** Des modifications ni enregistrées ni envoyées. */
+    unsaved() { return !!Editor.tree && Editor.sig() !== Editor.savedSig; },
+    /** Empreinte légère de l'état (recherches + textes changés) : le snapshot complet pèse plusieurs Mo. */
+    sig() { const t = Editor.tree; return t.files.map(f => f.text()).join('\0') + '\0\0' + Object.entries(t.locs).map(([k, l]) => k + l.files.filter(f => f.changed).map(f => f.name + '\0' + f.text()).join('\0')).join('\0'); },
 
     status() {
       const n = Editor.tree.changes().length;
+      const u = Editor.unsaved();
       const s = $('#rStatus');
-      s.textContent = n ? `${n} fichier${n > 1 ? 's' : ''} à envoyer dans le jeu` : 'À jour avec le jeu';
-      s.classList.toggle('dirty', n > 0);
+      const files = `${n} fichier${n > 1 ? 's' : ''} à envoyer dans le jeu`;
+      s.textContent = u ? 'Modifications non enregistrées' + (n ? ' · ' + files : '') : n ? 'Brouillon enregistré · ' + files : 'À jour avec le jeu';
+      s.classList.toggle('dirty', u || n > 0);
       $('#rUndo').disabled = !Editor.undo.length; $('#rRedo').disabled = !Editor.redo.length;
+      $('#rSave').disabled = !u;
       $('#rSend').disabled = !n;
+    },
+
+    /** Garde le travail dans le navigateur sans toucher au jeu. */
+    async save() {
+      const snap = Editor.tree.snapshot();
+      try {
+        if (snap === Editor.disk) await KV.del(DRAFT);
+        else await KV.set(DRAFT, { snap, disk: Editor.disk, at: Date.now() });
+        Editor.savedSig = Editor.sig();
+        toast('Enregistré (pas encore dans le jeu)');
+      } catch (e) { toast('Enregistrement impossible : ' + e.message); }
+      Editor.status();
     },
 
     /** À appeler avant une modification : elle pourra être annulée. */
@@ -426,8 +456,8 @@
           <div class="row"><button id="rAlignH">Aligner en ligne</button><button id="rAlignV">En colonne</button></div>
           <div class="row"><button id="rExc">Rendre exclusives</button></div>
           <button class="danger" id="rDelSel">Supprimer les ${sel.length} (Suppr)</button>`;
-        $('#rAlignH').onclick = () => { Editor.before(); const y = sel[0].num('y'); sel.forEach(t => t.set('y', y)); Editor.render(); };
-        $('#rAlignV').onclick = () => { Editor.before(); const x = sel[0].num('x'); sel.forEach(t => t.set('x', x)); Editor.render(); };
+        $('#rAlignH').onclick = () => { Editor.before(); const y = sel[0].num('y'); sel.forEach(t => { t.set('y', y); tree.fitYear(t); }); Editor.render(); };
+        $('#rAlignV').onclick = () => { Editor.before(); const x = sel[0].num('x'); sel.forEach(t => { t.set('x', x); tree.fitYear(t); }); Editor.render(); };
         $('#rExc').onclick = () => { Editor.before(); for (const a of sel) for (const b of sel) if (a !== b) tree.setExclusive(a, b, true); Editor.render(); };
         $('#rDelSel').onclick = Editor.deleteSelection;
         return;
@@ -474,9 +504,9 @@
       $('#rYear').onchange = edit(i => t.set('year', Math.round(+i.value) || 1936));
       $('#rCost').onchange = edit(i => t.set('cost', Math.max(0.05, +i.value || 1)));
       $('#rSmall').onchange = edit(i => t.set('small', i.checked ? 'yes' : '', ['x', 'y']));
-      $('#rFolder').onchange = edit(i => { t.set('folder', i.value); Editor.sel.clear(); });
-      $('#rX').onchange = edit(i => t.set('x', Math.round(+i.value) || 0));
-      $('#rY').onchange = edit(i => t.set('y', Math.round(+i.value) || 0));
+      $('#rFolder').onchange = edit(i => { t.set('folder', i.value); tree.fitYear(t); Editor.sel.clear(); });
+      $('#rX').onchange = edit(i => { t.set('x', Math.round(+i.value) || 0); tree.fitYear(t); });
+      $('#rY').onchange = edit(i => { t.set('y', Math.round(+i.value) || 0); tree.fitYear(t); });
       $('#rAddReq').onchange = e => { const o = tree.tech(e.target.value); if (!o) return; Editor.before(); if (!tree.link(o, t)) { Editor.undo.pop(); toast('Ce lien ferait une boucle'); } Editor.render(); };
       $('#rAddExc').onchange = e => { const o = tree.tech(e.target.value); if (!o) return; Editor.before(); tree.setExclusive(t, o, true); Editor.render(); };
       for (const b of el.querySelectorAll('.chip button')) b.onclick = () => {
@@ -634,6 +664,8 @@
       try {
         for (const c of ch) await Game.write(c.path, c.text);
         tree.markSaved();
+        Editor.disk = tree.snapshot(); Editor.savedSig = Editor.sig();
+        await KV.del(DRAFT);
         toast(`${ch.length} fichier${ch.length > 1 ? 's' : ''} écrit${ch.length > 1 ? 's' : ''} dans le jeu — relance le jeu pour voir l'arbre`);
       } catch (e) {
         toast('Écriture impossible : ' + e.message + ' (redonne l\'accès au dossier depuis l\'accueil)');
@@ -651,13 +683,14 @@
       $('#dlg').hidden = false;
     },
     async reload() {
-      if (Editor.dirty() && !confirm('Oublier les modifications pas encore envoyées et relire le jeu ?')) return;
+      if ((Editor.dirty() || Editor.unsaved()) && !confirm('Jeter le brouillon et les modifications pas encore envoyées, et relire le jeu ?')) return;
+      await KV.del(DRAFT);
       await Editor.load();
       Editor.sel.clear(); Editor.selLink = null; Editor.selTitle = null;
       Editor.render();
     },
     leave() {
-      if (Editor.dirty() && !confirm('Des modifications ne sont pas envoyées dans le jeu. Quitter quand même ?')) return;
+      if (Editor.unsaved() && !confirm('Des modifications ne sont pas enregistrées. Quitter quand même ?')) return;
       $('#research').hidden = true;
       showHub();
     },
@@ -772,7 +805,10 @@
         return;
       }
       if (d.kind === 'move' || d.kind === 'title') {
-        if (d.moved) { Editor.undo.push(d.snap); Editor.redo = []; Editor.render(); }
+        if (d.moved) {
+          if (d.kind === 'move') for (const [t] of d.start) Editor.tree.fitYear(t);   // l'année suit la ligne où on la pose
+          Editor.undo.push(d.snap); Editor.redo = []; Editor.render();
+        }
         return;
       }
       if (d.kind === 'link') {
@@ -816,7 +852,7 @@
       if (c && k === 'z') { e.preventDefault(); e.shiftKey ? Editor.doRedo() : Editor.doUndo(); }
       else if (c && k === 'y') { e.preventDefault(); Editor.doRedo(); }
       else if (c && k === 'd') { e.preventDefault(); Editor.duplicate(); }
-      else if (c && k === 's') { e.preventDefault(); Editor.send(); }
+      else if (c && k === 's') { e.preventDefault(); Editor.save(); }
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); Editor.deleteSelection(); }
       else if (k === 'escape') { Editor.sel.clear(); Editor.selLink = null; Editor.selTitle = null; Editor.render(); }
     },
@@ -828,7 +864,7 @@
   function mount() {
     const hub = document.createElement('div');
     hub.id = 'hub'; hub.hidden = true;
-    hub.innerHTML = `<h1>Atelier — Grande Stratégie 1936</h1>
+    hub.innerHTML = `<h1>Where Iron Bleeds — Atelier</h1>
       <div class="sub">Tout ce qui se modifie dans le jeu. Choisis une partie ; ce qui est prêt s'ouvre, le reste arrive.</div>
       <div id="hubGame"></div><div id="hubTiles"></div>`;
     document.body.insertBefore(hub, document.body.firstChild);
@@ -842,7 +878,8 @@
         <button id="rAdd" title="Nouvelle recherche au milieu de la vue (ou double-clic dans le vide)">＋ Recherche</button>
         <button id="rCheck">Vérifier</button>
         <button id="rReload" title="Relire les fichiers du jeu">⟳ Relire</button>
-        <button id="rSend" class="on" title="Écrire dans les fichiers du jeu (Ctrl+S)">Envoyer dans le jeu</button>
+        <button id="rSave" title="Garder le travail dans l'atelier sans toucher au jeu (Ctrl+S)">Enregistrer</button>
+        <button id="rSend" class="on" title="Écrire dans les fichiers du jeu">Envoyer dans le jeu</button>
         <span id="rStatus"></span>
       </div>
       <div id="rMain"><div id="rView" tabindex="0"><div id="rSize" style="position:absolute;left:0;top:0;pointer-events:none"></div><div id="rSurf"></div></div><div id="rSide"></div></div>`;
@@ -860,6 +897,7 @@
     $('#rAdd').onclick = () => { const p = Editor.viewCentre(); Editor.addAt(p.x + Editor.off.x, p.y + Editor.off.y); };
     $('#rCheck').onclick = Editor.check;
     $('#rReload').onclick = Editor.reload;
+    $('#rSave').onclick = Editor.save;
     $('#rSend').onclick = Editor.send;
     const v = $('#rView');
     v.addEventListener('pointerdown', Editor.down);
@@ -870,7 +908,7 @@
       if (e.target.closest('.rbox')) { const n = $('#rName'); if (n) { n.focus(); n.select(); } }
     });
     window.addEventListener('keydown', Editor.key);
-    window.addEventListener('beforeunload', e => { if (!$('#research').hidden && Editor.dirty()) { e.preventDefault(); e.returnValue = ''; } });
+    window.addEventListener('beforeunload', e => { if (!$('#research').hidden && Editor.unsaved()) { e.preventDefault(); e.returnValue = ''; } });
   }
 
   mount();

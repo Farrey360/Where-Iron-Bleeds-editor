@@ -161,7 +161,7 @@ Tes changements restent dans l'atelier : le moddeur peut tout annuler (Ctrl+Z), 
         T.setName('tech_' + t.get('id'), input.name_fr, 'french');
         T.setName('tech_' + t.get('id'), input.name_en, 'english');
         if (isNum(input.year)) t.set('year', Math.round(input.year));
-        if (isNum(input.cost)) t.set('cost', Math.max(0.05, input.cost));
+        if (isNum(input.cost)) t.set('cost', Math.round(Math.max(0.05, input.cost) * 100) + '%');
         if (input.small) t.set('small', 'yes', ['x', 'y']);
         for (const p of req) T.link(p, t);
         if (input.effects) { try { setEffects(t, input.effects); } catch (e) { T.removeTech(t); throw e; } }
@@ -181,7 +181,7 @@ Tes changements restent dans l'atelier : le moddeur peut tout annuler (Ctrl+Z), 
         if (isNum(input.y)) { t.set('y', Math.round(input.y)); if (!what.includes('place')) what.push('place'); }
         if (isNum(input.year)) { t.set('year', Math.round(input.year)); what.push('année'); }
         else if (input.folder || isNum(input.x) || isNum(input.y)) T.fitYear(t);
-        if (isNum(input.cost)) { t.set('cost', Math.max(0.05, input.cost)); what.push('coût'); }
+        if (isNum(input.cost)) { t.set('cost', Math.round(Math.max(0.05, input.cost) * 100) + '%'); what.push('coût'); }
         if (typeof input.small === 'boolean') { t.set('small', input.small ? 'yes' : '', ['x', 'y']); what.push('taille'); }
         if (input.icon !== undefined) { t.set('icon', input.icon === id ? '' : input.icon, ['id']); what.push('image'); }
         turn.folder = t.get('folder');

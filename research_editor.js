@@ -487,7 +487,7 @@
         <div class="row"><label>Anglais</label><input type="text" id="rNameEn" value="${esc(tree.name('tech_' + id, 'english'))}"></div>
         <div class="row"><label>Identifiant</label><input type="text" id="rId" value="${esc(id)}"></div>
         <div class="row"><label>Année</label><input type="number" id="rYear" value="${t.num('year', 1936)}"></div>
-        <div class="row"><label>Coût</label><input type="number" step="0.25" id="rCost" value="${t.num('cost', 1)}"></div>
+        <div class="row"><label>Coût (%)</label><input type="number" step="25" id="rCost" value="${Math.round(t.num('cost', 1) * 100)}"></div>
         <div class="row"><label>Petite case</label><input type="checkbox" id="rSmall" ${t.get('small') === 'yes' ? 'checked' : ''}></div>
         <div class="row"><label>Dossier</label><select id="rFolder">${tree.folders().map(f => `<option value="${esc(f)}" ${f === t.get('folder') ? 'selected' : ''}>${esc(tree.name('techfolder_' + f) || f)}</option>`).join('')}</select></div>
         <div class="row"><label>Position</label><input type="number" id="rX" value="${t.num('x', 0)}"><input type="number" id="rY" value="${t.num('y', 0)}"></div>
@@ -511,7 +511,7 @@
         Editor.render();
       };
       $('#rYear').onchange = edit(i => t.set('year', Math.round(+i.value) || 1936));
-      $('#rCost').onchange = edit(i => t.set('cost', Math.max(0.05, +i.value || 1)));
+      $('#rCost').onchange = edit(i => t.set('cost', Math.max(5, Math.round(+i.value || 100)) + '%'));
       $('#rSmall').onchange = edit(i => t.set('small', i.checked ? 'yes' : '', ['x', 'y']));
       $('#rFolder').onchange = edit(i => { t.set('folder', i.value); tree.fitYear(t); Editor.sel.clear(); });
       $('#rX').onchange = edit(i => { t.set('x', Math.round(+i.value) || 0); tree.fitYear(t); });

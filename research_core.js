@@ -69,7 +69,7 @@
   class Entry {
     constructor(kind, items) { this.kind = kind; this.items = items; }
     get(k, def) { const it = this.items.find(x => x && x.k === k); return it ? (typeof it.v === 'object' && 'q' in it.v ? it.v.q : it.v) : def; }
-    num(k, def) { const v = this.get(k); return v === undefined || Array.isArray(v) ? def : Number(v); }
+    num(k, def) { const v = this.get(k); if (v === undefined || Array.isArray(v)) return def; return String(v).endsWith('%') ? parseFloat(v) / 100 : Number(v); }
     has(k) { return this.items.some(x => x && x.k === k); }
     /** Change une valeur simple ; la clé garde sa place, sinon elle va après la dernière de `after` présente. */
     set(k, v, after) {

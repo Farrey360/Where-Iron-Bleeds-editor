@@ -49,7 +49,7 @@
 .ryline{position:absolute;background:#ffffff14}
 .rtitle{position:absolute;color:#aeb6c4;font:600 15px system-ui;white-space:nowrap;cursor:move;padding:0 4px;border-radius:4px}
 .rtitle:hover,.rtitle.sel{background:#4da3ff33;color:#fff}
-#rLinks{position:absolute;left:0;top:0;overflow:visible}
+#rLinks{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 #rLinks path{fill:none}
 #rLinks .hit{stroke:#0000;stroke-width:12;cursor:pointer;pointer-events:stroke}
 #rLinks .req{stroke:#9aa3b2;stroke-width:2}

@@ -152,7 +152,9 @@
     async remembered() { const h = await KV.get('gameDir').catch(() => null); return h ? h.name : ''; },
     async dir(path) { let d = Game.base; for (const n of path.split('/').filter(Boolean)) d = await d.getDirectoryHandle(n); return d; },
     async list(path) { const out = []; const d = await Game.dir(path); for await (const [n, h] of d.entries()) if (h.kind === 'file') out.push(n); return out.sort(); },
-    async read(path) { const i = path.lastIndexOf('/'); const f = await (await Game.dir(path.slice(0, i))).getFileHandle(path.slice(i + 1)); return (await f.getFile()).text(); },
+    async file(path) { const i = path.lastIndexOf('/'); const f = await (await Game.dir(path.slice(0, i))).getFileHandle(path.slice(i + 1)); return f.getFile(); },
+    async read(path) { return (await Game.file(path)).text(); },
+    async readBin(path) { return (await Game.file(path)).arrayBuffer(); },
     async write(path, text) {
       const i = path.lastIndexOf('/');
       const f = await (await Game.dir(path.slice(0, i))).getFileHandle(path.slice(i + 1), { create: true });
